@@ -7,11 +7,11 @@ import os
 import emcee
 
 # Create output dir if not exists
-OUT_DIR = 'analysis'
+OUT_DIR = 'output'
 os.makedirs(OUT_DIR, exist_ok=True)
 
 def load_chain(name, label):
-    filename = f'analysis/chains_emcee/chain_{name}.h5'
+    filename = f'chains_emcee/chain_{name}.h5'
     print(f"Loading {filename}...")
     try:
         reader = emcee.backends.HDFBackend(filename)
@@ -44,7 +44,7 @@ g.triangle_plot(roots, ['omm', 'w', 'H0'],
                 colors=['#3498db', '#95a5a6', '#e74c3c'], # Blue, Grey, Red
                 legend_labels=['BAO Only', 'BAO + SN (Original)', 'BAO + SN (Corrected)'],
                 line_args=[{'ls':'-', 'color':'#3498db'}, {'ls':'-', 'color':'#95a5a6'}, {'ls':'-', 'color':'#e74c3c'}])
-g.export('analysis/fig8_contours.png')
+g.export('output/fig8_contours.png')
 print("Saved contours to analysis/fig8_contours.png")
 
 # --- Figure 5: w vs Omm (2D Focused) ---
@@ -54,7 +54,7 @@ g.settings.lab_fontsize = 14
 g.plot_2d(roots, 'omm', 'w', filled=True, colors=['#3498db', '#95a5a6', '#e74c3c'])
 g.add_legend(['BAO Only', 'BAO + SN (Original)', 'BAO + SN (Corrected)'], legend_loc='upper right')
 plt.title('Equation of State $w$ vs $\Omega_m$', fontsize=16, pad=20)
-plt.savefig('analysis/fig5_w_omm.png', bbox_inches='tight')
+plt.savefig('output/fig5_w_omm.png', bbox_inches='tight')
 print("Saved 2D plot to analysis/fig5_w_omm.png")
 
 # --- Export Precision Table ---

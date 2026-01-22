@@ -4,7 +4,8 @@ from cobaya.run import run
 from cobaya.yaml import yaml_load_file
 
 # Define the base output directory
-OUT_DIR = "analysis/chains"
+# We are in analysis/, so chains is adjacent
+OUT_DIR = "chains"
 if not os.path.exists(OUT_DIR):
     os.makedirs(OUT_DIR)
 
@@ -43,8 +44,8 @@ theory = {"camb": {"extra_args": {"halofit_version": "takahashi"}}}
 # C: BAO + SN (Corrected)
 
 # Likelihoods
-cov_path = r"C:/Users/Sivar/.gemini/antigravity/scratch/UROPS-DarkEnergy-2026/data/external/PantheonPlus/Pantheon+_Data/4_DISTANCES_AND_COVAR"
-corr_cov_path = r"C:/Users/Sivar/.gemini/antigravity/scratch/UROPS-DarkEnergy-2026/data/external/PantheonPlus_Corrected/Pantheon+_Data/4_DISTANCES_AND_COVAR"
+cov_path = r"../data/external/PantheonPlus/Pantheon+_Data/4_DISTANCES_AND_COVAR"
+corr_cov_path = r"../data/external/PantheonPlus_Corrected/Pantheon+_Data/4_DISTANCES_AND_COVAR"
 
 # NOTE: Cobaya's sn.pantheonplus uses a specific .dataset file or path. 
 # It usually expects the standard Pantheon+ file structure.

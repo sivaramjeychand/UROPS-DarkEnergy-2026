@@ -10,19 +10,20 @@ from multiprocessing import Pool
 import sys
 
 # --- CONFIGURATION ---
-OUT_DIR = "analysis/chains_emcee"
+# --- CONFIGURATION ---
+OUT_DIR = "chains_emcee"
 if not os.path.exists(OUT_DIR):
     os.makedirs(OUT_DIR)
 
 # Filenames
-BAO_MEAN_FILE = r'data/external/DESI_BAO/desi_2024_gaussian_bao_ALL_GCcomb_mean.txt'
-BAO_COV_FILE = r'data/external/DESI_BAO/desi_2024_gaussian_bao_ALL_GCcomb_cov.txt'
+BAO_MEAN_FILE = r'../data/external/DESI_BAO/desi_2024_gaussian_bao_ALL_GCcomb_mean.txt'
+BAO_COV_FILE = r'../data/external/DESI_BAO/desi_2024_gaussian_bao_ALL_GCcomb_cov.txt'
 
-SN_FILE_UNCORR = r'data/external/PantheonPlus/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES.dat'
-SN_COV_UNCORR = r'data/external/PantheonPlus/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES_STAT+SYS.cov'
+SN_FILE_UNCORR = r'../data/external/PantheonPlus/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES.dat'
+SN_COV_UNCORR = r'../data/external/PantheonPlus/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES_STAT+SYS.cov'
 
-SN_FILE_CORR = r'data/external/PantheonPlus_Corrected/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES.dat'
-SN_COV_CORR = r'data/external/PantheonPlus_Corrected/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES_STAT+SYS.cov'
+SN_FILE_CORR = r'../data/external/PantheonPlus_Corrected/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES.dat'
+SN_COV_CORR = r'../data/external/PantheonPlus_Corrected/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES_STAT+SYS.cov'
 
 # --- LOAD BAO DATA ---
 print("Loading BAO Data...")
