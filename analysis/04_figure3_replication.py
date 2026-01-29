@@ -114,16 +114,16 @@ for label, df_sn, color, ax in datasets:
     ax.scatter(z_vals, data_y, color=color, alpha=0.05, s=10, zorder=1)
     
     # Binned Statistics
-    bins = np.logspace(np.log10(0.01), np.log10(1.3), 15)
-    c = pd.cut(z_vals, bins)
+    # Binned Statistics (50 SNe per bin)
+    # Sort by redshift
+    df_sorted = pd.DataFrame({'z': z_vals, 'HR': data_y}).sort_values('z')
+    df_sorted['bin_id'] = np.arange(len(df_sorted)) // 50
     
-    # Recalculate means in the new HR space
-    df_temp = pd.DataFrame({'z': z_vals, 'HR': data_y})
-    m = df_temp.groupby(c, observed=False)['z'].mean()
-    v = df_temp.groupby(c, observed=False)['HR'].mean()
-    e = df_temp.groupby(c, observed=False)['HR'].std() / np.sqrt(df_temp.groupby(c, observed=False)['HR'].count())
-
-    e = df_temp.groupby(c, observed=False)['HR'].std() / np.sqrt(df_temp.groupby(c, observed=False)['HR'].count())
+    # Aggregation
+    group = df_sorted.groupby('bin_id')
+    m = group['z'].mean()
+    v = group['HR'].mean()
+    e = group['HR'].std() / np.sqrt(group['HR'].count())
     
     # Use light blue for points as in the image (or similar)
     ax.errorbar(m, v, yerr=e, fmt='o', color='dodgerblue', markersize=6, 

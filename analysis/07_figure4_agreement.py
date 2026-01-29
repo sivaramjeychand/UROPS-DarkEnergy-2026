@@ -111,13 +111,14 @@ for label, df_sn, color, ax in datasets:
     resid_sn = df_sn['MU_SH0ES'].values - base_dist
     
     # Binning
-    bins = np.logspace(np.log10(0.01), np.log10(1.5), 20)
-    c = pd.cut(df_sn['zHD'], bins)
+    # Binning (50 SNe per bin)
+    df_sorted = pd.DataFrame({'z': df_sn['zHD'], 'res': resid_sn}).sort_values('z')
+    df_sorted['bin_id'] = np.arange(len(df_sorted)) // 50
     
-    temp = pd.DataFrame({'z': df_sn['zHD'], 'res': resid_sn})
-    m = temp.groupby(c, observed=False)['z'].mean()
-    v = temp.groupby(c, observed=False)['res'].mean()
-    e = temp.groupby(c, observed=False)['res'].std() / np.sqrt(temp.groupby(c, observed=False)['res'].count())
+    group = df_sorted.groupby('bin_id')
+    m = group['z'].mean()
+    v = group['res'].mean()
+    e = group['res'].std() / np.sqrt(group['res'].count())
     
     # Plot Binned SN
     ax.errorbar(m, v, yerr=e, fmt='o', color=color, markersize=6, label='Pantheon+ Binned', zorder=5)
