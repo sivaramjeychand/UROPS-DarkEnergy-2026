@@ -4,14 +4,39 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM, LambdaCDM, w0waCDM
+import os
 
-# 1. Load Data
-DATA_FILE = 'Rose19_corrected.csv'
-df = pd.read_csv(DATA_FILE)
 
 # 2. Define Cosmologies
 # H0 should match the data derivation roughly, but cancels in residuals if M is fitted. We use 73.04 typical.
 H0 = 73.04
+
+# Baseline: Omega_m = 0.30, Omega_de = 0.00 (Open Universe)
+cosmo_baseline = LambdaCDM(H0=H0, Om0=0.30, Ode0=0.0)
+
+# 1. Load Data
+# We now use the processed files from Step 6 for consistency
+path_sn_orig = r'../data/external/PantheonPlus/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES.dat'
+path_sn_lin = r'../data/external/PantheonPlus_Corrected/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES_Linear.dat'
+path_sn_poly = r'../data/external/PantheonPlus_Corrected/Pantheon+_Data/4_DISTANCES_AND_COVAR/Pantheon+SH0ES_Poly.dat'
+
+# Load files
+if os.path.exists(path_sn_orig):
+    sn_orig = pd.read_csv(path_sn_orig, sep='\s+', skiprows=0 if 'CID' in open(path_sn_orig).read(100) else 1)
+else:
+    print("Error: Original SN file not found.")
+    exit()
+
+if os.path.exists(path_sn_lin):
+    sn_lin = pd.read_csv(path_sn_lin, sep='\s+', skiprows=0 if 'CID' in open(path_sn_lin).read(100) else 1)
+else:
+    sn_lin = sn_orig.copy(); print("Linear missing.")
+
+if os.path.exists(path_sn_poly):
+    sn_poly = pd.read_csv(path_sn_poly, sep='\s+', skiprows=0 if 'CID' in open(path_sn_poly).read(100) else 1)
+else:
+    sn_poly = sn_orig.copy(); print("Poly missing.")
+
 
 # Baseline: Omega_m = 0.30, Omega_de = 0.00 (Open Universe)
 # Note: LambdaCDM with Ode0=0 is effectively open if Om0 < 1
@@ -44,23 +69,38 @@ diff_green = get_diff(cosmo_green, z_grid)
 # We want HR_new = mu_obs - mu_baseline
 # so HR_new = (HR + mu_old_ref) - mu_baseline
 #           = HR + (mu_old_ref - mu_baseline)
-data_offset = cosmo_old_ref.distmod(df['z']).value - cosmo_baseline.distmod(df['z']).value
 
-df['HR_new'] = df['HR'] + data_offset
-df['HR_corr_new'] = df['HR_corr'] + data_offset
+# 4. Calculate Residuals for Plotting
+# HR = MU_SH0ES - MU_Model_Baseline
+# Note: Pantheon+ MU_SH0ES includes H0 ~ 73.04 scaling.
+# Baseline cosmo should match this.
+
+base_dist_orig = cosmo_baseline.distmod(sn_orig['zHD'].values).value
+sn_orig['HR_plot'] = sn_orig['MU_SH0ES'] - base_dist_orig
+
+base_dist_lin = cosmo_baseline.distmod(sn_lin['zHD'].values).value
+sn_lin['HR_plot'] = sn_lin['MU_SH0ES'] - base_dist_lin
+
+base_dist_poly = cosmo_baseline.distmod(sn_poly['zHD'].values).value
+sn_poly['HR_plot'] = sn_poly['MU_SH0ES'] - base_dist_poly
 
 print("Cosmologies defined and data transformed.")
 
 # 5. Plotting
-fig, axes = plt.subplots(2, 1, figsize=(10, 10), sharex=True, gridspec_kw={'hspace': 0.1})
+fig, axes = plt.subplots(3, 1, figsize=(10, 14), sharex=True, gridspec_kw={'hspace': 0.1})
 
-# Loop for Top (Before) and Bottom (After)
+# Loop for Panels
 datasets = [
-    ('Before Correction', df['HR_new'], 'gray', axes[0]),
-    ('After Correction', df['HR_corr_new'], 'gray', axes[1])
+    ('Before Correction', sn_orig, 'gray', axes[0]),
+    ('Linear Correction', sn_lin, 'gray', axes[1]),
+    ('Polynomial Correction', sn_poly, 'black', axes[2])
 ]
 
-for label, data_y, color, ax in datasets:
+
+for label, df_sn, color, ax in datasets:
+    data_y = df_sn['HR_plot']
+    z_vals = df_sn['zHD']
+    
     # Plot Baseline
     ax.axhline(0, color='black', linestyle=':', label='Baseline ($\Omega_m=0.3, \Omega_{de}=0.0$)')
     
@@ -68,24 +108,21 @@ for label, data_y, color, ax in datasets:
     # Note: Curves are identical in both panels as they represent models
     ax.plot(z_grid, diff_red, 'r-', linewidth=2, label='$\Lambda$CDM ($\Omega_m=0.30$)')
     ax.plot(z_grid, diff_blue, 'b-', linewidth=2, alpha=0.8, label='$w_0w_a$CDM (Blue Params)')
-    # Green is dashed in the original image example roughly, or solid. We'll use dashed for distinction as per some conventions or just solid.
-    # User image has Blue solid, Red solid, Green dashed.
     ax.plot(z_grid, diff_green, 'g--', linewidth=2, alpha=0.8, label='$w_0w_a$CDM (Green Params)')
     
     # Plot Individual Points
-    # We skip plotting 1000s of points to keep it clean, or plot them very faintly?
-    # The user image shows binned points mainly. We will plot faint scatter + binned.
-    ax.scatter(df['z'], data_y, color=color, alpha=0.1, s=10, zorder=1)
+    ax.scatter(z_vals, data_y, color=color, alpha=0.05, s=10, zorder=1)
     
     # Binned Statistics
-    # ~50 bins or strictly 50 per bin. We'll use logspace bins.
-    bins = np.logspace(np.log10(df['z'].min()), np.log10(df['z'].max()), 15)
-    c = pd.cut(df['z'], bins)
+    bins = np.logspace(np.log10(0.01), np.log10(1.3), 15)
+    c = pd.cut(z_vals, bins)
     
     # Recalculate means in the new HR space
-    df_temp = pd.DataFrame({'z': df['z'], 'HR': data_y})
+    df_temp = pd.DataFrame({'z': z_vals, 'HR': data_y})
     m = df_temp.groupby(c, observed=False)['z'].mean()
     v = df_temp.groupby(c, observed=False)['HR'].mean()
+    e = df_temp.groupby(c, observed=False)['HR'].std() / np.sqrt(df_temp.groupby(c, observed=False)['HR'].count())
+
     e = df_temp.groupby(c, observed=False)['HR'].std() / np.sqrt(df_temp.groupby(c, observed=False)['HR'].count())
     
     # Use light blue for points as in the image (or similar)
@@ -97,18 +134,21 @@ for label, data_y, color, ax in datasets:
     ax.grid(True, which='both', linestyle=':', alpha=0.3)
 
     # Legend only on top or bottom? User image has it on both or specific.
-    if ax == axes[1]:
-        ax.legend(loc='lower right', fontsize=9, framealpha=0.9)
+    ax.text(0.05, 0.85, label, transform=ax.transAxes, fontsize=14, fontweight='bold')
+    ax.grid(True, which='both', linestyle=':', alpha=0.3)
 
-axes[1].set_xlabel('Redshift (z)', fontsize=12)
-axes[1].set_xlim(0, 1.3)
+    if ax == axes[2]:
+        ax.legend(loc='lower right', fontsize=9, framealpha=0.9, ncol=2)
+
+axes[2].set_xlabel('Redshift (z)', fontsize=12)
+axes[2].set_xlim(0, 1.3)
 
 # Determine Y-limits to match image roughly
-# Image goes from ~ -0.2 to 0.4
 axes[0].set_ylim(-0.3, 0.4)
 axes[1].set_ylim(-0.3, 0.4)
+axes[2].set_ylim(-0.3, 0.4)
 
 plt.tight_layout()
-plt.savefig('output/fig3_replication_custom.png')
+plt.savefig('output/fig3_replication_comparison.png')
 plt.show()
 

@@ -21,14 +21,16 @@ df_clean = df[mask].copy()
 # Weights
 weights = 1.0 / (df_clean['e_HR']**2)
 
-# Perform Weighted Linear Fit (Degree 1)
-# p returns [slope, intercept]
-# cov returns covariance matrix (to get errors)
-p, cov = np.polyfit(df_clean['logAl'], df_clean['HR'], 1, w=weights, cov=True)
+# Perform Weighted Polynomial Fit (Degree 2)
+# p returns coefficients [a, b, c] for ax^2 + bx + c
+# cov returns covariance matrix
+p, cov = np.polyfit(df_clean['logAl'], df_clean['HR'], 2, w=weights, cov=True)
 
-slope_w = p[0]
-intercept_w = p[1]
-slope_err_w = np.sqrt(cov[0,0])
+# Extract coefficients
+a_curr = p[0] # Curvature
+b_curr = p[1] # Slope-like
+c_curr = p[2] # Intercept
+
 
 # Calculate standard stats for the text box (using Pearson from scipy)
 # Note: Pearson r is technically unweighted, but standard for reporting correlation strength
@@ -41,11 +43,11 @@ plt.figure(figsize=(9, 7))
 plt.errorbar(df_clean['logAl'], df_clean['HR'], yerr=df_clean['e_HR'], fmt='o', 
              color='gray', alpha=0.3, markersize=5, label='Rose+19 Individual SNe', zorder=1)
 
-# The Weighted Best-Fit Line (Black Line)
+# The Weighted Best-Fit Curve (Black Line)
 x_fit = np.linspace(df_clean['logAl'].min(), df_clean['logAl'].max(), 100)
-y_fit = slope_w * x_fit + intercept_w
+y_fit = np.polyval(p, x_fit)
 plt.plot(x_fit, y_fit, 'k-', linewidth=2, 
-         label=f'Weighted Fit (Slope = {slope_w:.3f} $\pm$ {slope_err_w:.3f})', zorder=5)
+         label=f'Weighted Poly Fit (deg=2)', zorder=5)
 
 # Binned Averages (Red Dots) - Helps visualize the trend
 bins = np.linspace(df_clean['logAl'].min(), df_clean['logAl'].max(), 7)
@@ -62,13 +64,15 @@ plt.errorbar(m['logAl'], v['HR'], yerr=e['HR'], fmt='o', color='red', markersize
 plt.axhline(0, color='black', linestyle='--', alpha=0.5)
 plt.xlabel('Log Age (Local) [yr]', fontsize=12)
 plt.ylabel('Hubble Residual (mag)', fontsize=12)
-plt.title('Figure 1 Replication: Age-Bias Correlation (Weighted Fit)', fontsize=14, pad=15)
+plt.title('Figure 1 Replication: Age-Bias Correlation (Polynomial Fit)', fontsize=14, pad=15)
 plt.grid(True, linestyle=':', alpha=0.5)
 
 # Statistics Box
-stats_text = (f"Weighted Slope = {slope_w:.3f} $\pm$ {slope_err_w:.3f}\n"
-              f"Pearson r = {r_value:.3f}\n"
-              f"p-value = {p_value:.2e}")
+stats_text = (f"Fit: $y = ax^2 + bx + c$\n"
+              f"a = {a_curr:.3f}\n"
+              f"b = {b_curr:.3f}\n"
+              f"c = {c_curr:.3f}\n"
+              f"Pearson r = {r_value:.3f}")
 
 plt.text(0.05, 0.05, stats_text, transform=plt.gca().transAxes, 
          fontsize=12, fontweight='bold', 
@@ -78,6 +82,6 @@ plt.legend(loc='upper right', fontsize=10)
 plt.tight_layout()
 
 # Save and Show
-plt.savefig('output/fig1_replication_weighted.png')
+plt.savefig('output/fig1_replication_polynomial.png')
 plt.show()
 
