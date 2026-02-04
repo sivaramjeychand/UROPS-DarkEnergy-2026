@@ -2,7 +2,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.cosmology import FlatLambdaCDM, LambdaCDM, w0waCDM
+from astropy.cosmology import FlatLambdaCDM, LambdaCDM, w0waCDM, FlatwCDM
 import os
 
 # 1. Define Cosmologies
@@ -62,8 +62,6 @@ for df in [sn_orig, sn_lin, sn_poly]:
     df['HR_plot'] = df['MU'] - base_dist
 
 # Shift Residuals (Center low-z around 0)
-# print("Anchoring each dataset individually to 0 at low-z...")
-
 for df in [sn_orig, sn_lin, sn_poly]:
     # 1. Find low-z stars IN THIS SPECIFIC DATAFRAME
     mask_anchor = df['zHD'] < 0.1
@@ -89,6 +87,18 @@ diff_red = get_diff(cosmo_red, z_grid)
 diff_blue = get_diff(cosmo_blue, z_grid)
 diff_green = get_diff(cosmo_green, z_grid)
 
+# Load Best Fits
+best_fits = {}
+mcmc_file = r'chains_emcee_all/best_fits.csv'
+if os.path.exists(mcmc_file):
+    try:
+        df_fits = pd.read_csv(mcmc_file)
+        for _, row in df_fits.iterrows():
+            best_fits[row['Dataset']] = row
+        print("Loaded MCMC Best Fits.")
+    except Exception as e:
+        print(f"Failed to load fits: {e}")
+
 fig, axes = plt.subplots(3, 1, figsize=(10, 14), sharex=True, gridspec_kw={'hspace': 0.1})
 
 datasets = [
@@ -108,6 +118,44 @@ for label, df_sn, color, ax in datasets:
     ax.plot(z_grid, diff_red, 'r-', linewidth=2, label='$\Lambda$CDM')
     ax.plot(z_grid, diff_blue, 'b-', linewidth=2, alpha=0.8, label='$w_0w_a$CDM (Blue)')
     ax.plot(z_grid, diff_green, 'g--', linewidth=2, alpha=0.8, label='$w_0w_a$CDM (Green)')
+    
+    # Plot MCMC Best Fit
+    fit_name = None
+    if label.startswith('Before'): fit_name = 'DES_Uncorr'
+    elif label.startswith('Linear'): fit_name = 'DES_Lin'
+    elif label.startswith('Polynomial'): fit_name = 'DES_Poly'
+    
+    if fit_name and fit_name in best_fits:
+        p = best_fits[fit_name]
+        cosmo_fit = FlatwCDM(H0=p['H0'], Om0=p['Om'], w0=p['w'])
+        diff_fit = get_diff(cosmo_fit, z_grid)
+        
+        # Calculate offset for this dataset (again) to apply to model
+        # The data plotted (data_y) is already shifted.
+        # We need the shift value.
+        # Shift was based on unshifted df_sn.
+        # But wait, df_sn['HR_plot'] IS shifted by the time we get here (lines 67-80).
+        # We can't recalculate easily unless we store it.
+        # Alternatively, we calculate the median of the *plotted* low-z data?
+        # The plotted data is anchored to 0 at low-z.
+        # So the offset applied to data was X.
+        # Model should also be offset by X?
+        # NO. If we force data to 0 at z->0, the model (which starts at 0 diff if H0 matches) should also start at 0.
+        # If best fit H0 != Baseline H0, model has offset.
+        # We should plot `MU_FIT - MU_BASE - OFFSET`.
+        # Where OFFSET is what forced `MU_DATA - MU_BASE` to 0.
+        # Let's approximate offset by `diff_fit[0]`? No.
+        # Let's just anchor the Best Fit curve to 0 at z=0 (or low z) as well?
+        # Yes, visually that's what we want: compare shapes.
+        # Shift model so it passes through 0 at z=0.01
+        model_offset = diff_fit[0] 
+        # Actually diff_fit[0] is at z=0.01.
+        diff_fit_shifted = diff_fit - model_offset
+        
+        lbl_fit = f"MCMC Best Fit\n$w={p['w']:.2f}, \Omega_m={p['Om']:.2f}$"
+        # Use cyan for best fit
+        ax.plot(z_grid, diff_fit_shifted, color='cyan', linestyle='--', linewidth=3, label=lbl_fit)
+
     
     # Points
     ax.scatter(z_vals, data_y, color=color, alpha=0.05, s=10, zorder=1)

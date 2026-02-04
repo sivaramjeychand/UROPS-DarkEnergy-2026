@@ -3,7 +3,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.cosmology import FlatLambdaCDM, LambdaCDM, w0waCDM
+from astropy.cosmology import FlatLambdaCDM, LambdaCDM, w0waCDM, FlatwCDM
 import os
 
 
@@ -64,7 +64,20 @@ diff_red = get_diff(cosmo_red, z_grid)
 diff_blue = get_diff(cosmo_blue, z_grid)
 diff_green = get_diff(cosmo_green, z_grid)
 
-# 4. Transform Data Distances
+# Load Best Fits
+best_fits = {}
+mcmc_file = r'chains_emcee_all/best_fits.csv'
+if os.path.exists(mcmc_file):
+    try:
+        df_fits = pd.read_csv(mcmc_file)
+        # Columns: Dataset, Om, w, H0
+        for _, row in df_fits.iterrows():
+            best_fits[row['Dataset']] = row
+        print("Loaded MCMC Best Fits.")
+    except Exception as e:
+        print(f"Failed to load MCMC fits: {e}")
+
+# Transform Data Distances
 # Current HR = mu_obs - mu_old_ref
 # We want HR_new = mu_obs - mu_baseline
 # so HR_new = (HR + mu_old_ref) - mu_baseline
@@ -110,6 +123,25 @@ for label, df_sn, color, ax in datasets:
     ax.plot(z_grid, diff_blue, 'b-', linewidth=2, alpha=0.8, label='$w_0w_a$CDM (Blue Params)')
     ax.plot(z_grid, diff_green, 'g--', linewidth=2, alpha=0.8, label='$w_0w_a$CDM (Green Params)')
     
+    # Plot MCMC Best Fit
+    fit_name = None
+    if label == 'Before Correction': fit_name = 'Pantheon_Uncorr'
+    elif label == 'Linear Correction': fit_name = 'Pantheon_Lin'
+    elif label == 'Polynomial Correction': fit_name = 'Pantheon_Poly'
+    
+    if fit_name and fit_name in best_fits:
+        p = best_fits[fit_name]
+        # Create Cosmo
+        # Note: MCMC w is w0. wa=0.
+        cosmo_fit = FlatwCDM(H0=p['H0'], Om0=p['Om'], w0=p['w'])
+        diff_fit = get_diff(cosmo_fit, z_grid)
+        # Apply the same offset as data: None for Pantheon as we didn't shift it.
+        diff_fit_shifted = diff_fit 
+        
+        # Add label with params
+        lbl_fit = f"MCMC Best Fit"
+        ax.plot(z_grid, diff_fit_shifted, color='cyan', linestyle='--', linewidth=3, label=lbl_fit)
+
     # Plot Individual Points
     ax.scatter(z_vals, data_y, color=color, alpha=0.05, s=10, zorder=1)
     
