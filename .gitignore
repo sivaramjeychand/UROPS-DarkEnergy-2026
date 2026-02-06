@@ -4,6 +4,7 @@
 # Ignore Data
 data/
 chains/
+analysis/chains_emcee_w0wa/
 output/
 
 # Ignore Python cache

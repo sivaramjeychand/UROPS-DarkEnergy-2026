@@ -66,8 +66,17 @@ def load_sn(data_path, cov_path):
              df = pd.read_csv(data_path, delim_whitespace=True)
              if 'zHD' not in df.columns:
                  df = pd.read_csv(data_path, delim_whitespace=True, skiprows=1)
+             
+             # Apply Low-z Cut for Pantheon (Key Fix A)
+             print(f"Pantheon: {len(df)} total SNe.")
+             df = df[df['zHD'] > 0.01]
+             print(f"Pantheon (z>0.01): {len(df)} SNe.")
+             
              z = df['zHD'].values
              mu = df['MU_SH0ES'].values
+             
+             # Need indices to filter covariance later if it's the full matrix
+             indices = df.index.values
         except:
             return None, None, None
     else:
@@ -105,6 +114,10 @@ def load_sn(data_path, cov_path):
             df = df.dropna(subset=['zHD', col_mu])
             z = df['zHD'].values
             mu = df[col_mu].values
+            
+            # DES Covariance is compressed, so indices might not map directly unless we assume sorted
+            # But we handle DES cov separately below.
+            indices = None 
 
         except Exception as e:
              print(f"DES Load Error: {e}")
@@ -120,6 +133,15 @@ def load_sn(data_path, cov_path):
             cov = np.loadtxt(cov_path)
         N = int(np.sqrt(len(cov.flatten())))
         cov = cov.reshape((N, N))
+        
+        # Filter Covariance for Pantheon if indices exist
+        if 'Pantheon' in data_path and indices is not None:
+            # Check if cov size matches ORIGINAL data size
+            # We assume typical Pantheon+ file has 1701 lines.
+            if cov.shape[0] > len(z):
+                print(f"Filtering Pantheon Covariance: {cov.shape[0]} -> {len(z)}")
+                # Use numpy ix_ to select submatrix
+                cov = cov[np.ix_(indices, indices)]
         
     elif cov_path.endswith('.npz'):
         # DES style (Compressed Inverse Cov)
@@ -140,31 +162,16 @@ def load_sn(data_path, cov_path):
             # Check length
             if len(z) != n:
                 print(f"DES Size Mismatch: Data={len(z)}, CovExp={n}")
-                # Simple truncation strategy if close match
+                 # Simple truncation strategy if close match
                 if abs(len(z) - n) < 5:
                     print(f"Truncating/matching data to {n}")
                     z = z[:n]
                     mu = mu[:n]
-                    # We have inverse cov, we need cov for marginalization logic later if needed?
-                    # The likelihood uses inv_cov.
-                    # But load_sn returns inv_cov.
-                    # HOWEVER: run_emcee_all used 'inv_cov = np.linalg.inv(cov)' at the end.
-                    # DES loading logic here returns inv_cov directly from file?
-                    # Wait, run_emcee_all line 198 tries to invert 'cov'. 
-                    # If I return inv_cov as 'cov', it will invert it back to C.
-                    # Let's adjust:
-                    pass
                 else:
                     print("Major mismatch. Aborting DES load.")
                     return None, None, None
             
-            # Start with inv_cov
-            # We need to return C because the end of this function inverts it again!
-            # Or we change the end.
-            # To match run_emcee_all structure:
-            
-            cov = np.linalg.inv(inv_cov) # Prepare C so the function end can invert it back to InvC.
-            # It's a bit redundant but keeps structure consistent with Pantheon path.
+            cov = np.linalg.inv(inv_cov) 
                 
         except Exception as e:
             print(f"DES Cov Error: {e}")
@@ -176,9 +183,10 @@ def load_sn(data_path, cov_path):
         return None, None, None
         
     try:
-        inv_cov = np.linalg.inv(cov)
+        # Use pseudo-inverse for stability (Key Fix C)
+        inv_cov = np.linalg.pinv(cov)
     except:
-        print("Singular Matrix"); return None, None, None
+        print("Matrix Inversion Failed"); return None, None, None
         
     return z, mu, inv_cov
 
@@ -263,11 +271,7 @@ def log_prob_w0wa(theta, z_sn, mu_sn, inv_sn_cov):
     
     chi2_sn_marg = chi2_stat - (sum_w_delta**2 / sum_w)
     
-    # --- 3. CMB Prior (Planck) ---
-    # Constrains Omega_m
-    chi2_prior = ((Om - 0.315) / 0.007)**2
-    
-    return -0.5 * (chi2_bao + chi2_sn_marg + chi2_prior)
+    return -0.5 * (chi2_bao + chi2_sn_marg)
 
 def run_chain(name, z, mu, inv_cov, steps=100):
     print(f"Running Chain (w0wa): {name} (Steps: {steps})")
