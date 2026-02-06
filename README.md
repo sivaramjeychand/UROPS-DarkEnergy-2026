@@ -28,19 +28,21 @@ We successfully replicated the central anomaly reported in the literature and id
 
 **Comparison of $w_0w_a$CDM Parameters (with BAO + CMB Priors):**
 
-| Dataset & Correction | $\Omega_m$ | $w_0$ | $w_a$ | $q_0$ (State) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Standard Baseline** | | | | |
-| Pantheon+ (Uncorrected) | $0.315$ | $-0.92$ | $-0.49$ | **$-0.44$ (Accel)** |
-| DES-SN5YR (Uncorrected) | $0.326$ | $-0.85$ | $-0.93$ | **$-0.36$ (Accel)** |
-| **Linear Correction (Paper)** | | | | |
-| Pantheon+ (Linear) | $0.392$ | $-0.62$ | $-1.81$ | **$-0.06$ (Weak)** |
-| DES-SN5YR (Linear) | $0.392$ | $-0.54$ | $-1.91$ | **$+0.01$ (Decel)** |
-| **Polynomial Correction (Ours)** | | | | |
-| Pantheon+ (Poly) | $0.320$ | $-0.88$ | $-0.61$ | **$-0.40$ (Accel)** |
-| DES-SN5YR (Poly) | $0.341$ | $-0.76$ | $-1.42$ | **$-0.25$ (Accel)** |
+| Dataset | Correction | Source | $\Omega_m$ | $w_0$ | $w_a$ | $q_0$ | State |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **DES-SN5YR** | Uncorrected | Paper (Table 2) | $0.319$ | $-0.78$ | $-0.71$ | $-0.30$ | Accelerating |
+| | Uncorrected | **Replication** | **$0.326$** | **$-0.85$** | **$-0.93$** | **$-0.36$** | **Accelerating** |
+| | Linear | Paper (Table 2) | $0.374$ | $-0.32$ | $-2.14$ | $+0.20$ | Decelerating |
+| | Linear | **Replication** | **$0.392$** | **$-0.54$** | **$-1.91$** | **$+0.01$** | **Decelerating** |
+| | Polynomial | **Replication** | **$0.341$** | **$-0.76$** | **$-1.42$** | **$-0.25$** | **Accelerating** |
+| | | | | | | | |
+| **Pantheon+** | Uncorrected | Paper (Table 2) | $0.301$ | $-0.89$ | $-0.20$ | $-0.43$ | Accelerating |
+| | Uncorrected | **Replication** | **$0.315$** | **$-0.92$** | **$-0.49$** | **$-0.44$** | **Accelerating** |
+| | Linear | Paper (Table 2) | $0.359$ | $-0.45$ | $-1.63$ | $+0.06$ | Decelerating |
+| | Linear | **Replication** | **$0.392$** | **$-0.62$** | **$-1.81$** | **$-0.06$** | **Accelerating** |
+| | Polynomial | **Replication** | **$0.320$** | **$-0.88$** | **$-0.61$** | **$-0.40$** | **Accelerating** |
 
-*Note: The Linear correction systematically pushes $\Omega_m$ high and $w_a$ very negative, signaling a breakdown in the dark energy consistency. The Polynomial correction maintains consistency with the standard model.*
+*Note: The Linear correction systematically pushes $\Omega_m$ high and $w_a$ very negative. For DES-SN5YR, this drives the universe into deceleration. The Polynomial correction (ours) consistently restores the acceleration signal.*
 
 ## 📂 Repository Structure
 
