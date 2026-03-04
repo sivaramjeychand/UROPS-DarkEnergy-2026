@@ -1,6 +1,7 @@
 
 import os
 import numpy as np
+import pd as pd
 import pandas as pd
 import emcee
 import camb
@@ -74,19 +75,15 @@ def load_sn(data_path, cov_path):
              
              z = df['zHD'].values
              mu = df['MU_SH0ES'].values
-             
-             # Need indices to filter covariance later if it's the full matrix
              indices = df.index.values
         except:
             return None, None, None
     else:
         # DES Format
-        # Original has VARNAMES, Corrected files (saved by me) are standard space-sep
         try:
             with open(data_path, 'r') as f:
                 lines = f.readlines()
             
-            # 1. Try finding VARNAMES (Original DES)
             start_row = 0
             names = None
             for i, line in enumerate(lines):
@@ -100,23 +97,15 @@ def load_sn(data_path, cov_path):
                 content = "".join(lines[start_row:])
                 df = pd.read_csv(io.StringIO(content), sep=r'\s+', names=names, comment='#')
             else:
-                # 2. Fallback: Standard DataFrame (Corrected files)
                 df = pd.read_csv(data_path, sep='\s+', comment='#')
 
-            # Ensure numeric
             df['zHD'] = pd.to_numeric(df['zHD'], errors='coerce')
             col_mu = 'MU' if 'MU' in df.columns else 'MU_SH0ES'
-            if col_mu not in df.columns:
-                 pass
             df[col_mu] = pd.to_numeric(df[col_mu], errors='coerce')
             
-            # Filter valid
             df = df.dropna(subset=['zHD', col_mu])
             z = df['zHD'].values
             mu = df[col_mu].values
-            
-            # DES Covariance is compressed, so indices might not map directly unless we assume sorted
-            # But we handle DES cov separately below.
             indices = None 
 
         except Exception as e:
@@ -125,7 +114,6 @@ def load_sn(data_path, cov_path):
     
     # Load Covariance
     if cov_path.endswith('.cov') or cov_path.endswith('.txt'):
-        # Pantheon style
         header = open(cov_path).readline()
         if len(header.split()) == 1:
             cov = np.loadtxt(cov_path, skiprows=1)
@@ -134,59 +122,38 @@ def load_sn(data_path, cov_path):
         N = int(np.sqrt(len(cov.flatten())))
         cov = cov.reshape((N, N))
         
-        # Filter Covariance for Pantheon if indices exist
         if 'Pantheon' in data_path and indices is not None:
-            # Check if cov size matches ORIGINAL data size
-            # We assume typical Pantheon+ file has 1701 lines.
             if cov.shape[0] > len(z):
                 print(f"Filtering Pantheon Covariance: {cov.shape[0]} -> {len(z)}")
-                # Use numpy ix_ to select submatrix
                 cov = cov[np.ix_(indices, indices)]
         
     elif cov_path.endswith('.npz'):
-        # DES style (Compressed Inverse Cov)
         try:
             d = np.load(cov_path)
             n = d['nsn'][0]
             flat = d['cov']
-            
-            # Reconstruct Full Matrix (Upper Tri)
             full = np.zeros((n, n))
             full[np.triu_indices(n)] = flat
-            # Symmetrize
             mat = full + full.T - np.diag(np.diag(full))
-            
-            # This 'mat' is likely the INVERSE Covariance
             inv_cov = mat
-            
-            # Check length
             if len(z) != n:
-                print(f"DES Size Mismatch: Data={len(z)}, CovExp={n}")
-                 # Simple truncation strategy if close match
                 if abs(len(z) - n) < 5:
-                    print(f"Truncating/matching data to {n}")
                     z = z[:n]
                     mu = mu[:n]
                 else:
-                    print("Major mismatch. Aborting DES load.")
                     return None, None, None
-            
             cov = np.linalg.inv(inv_cov) 
                 
         except Exception as e:
-            print(f"DES Cov Error: {e}")
             return None, None, None
 
-    # Final Check
     if len(z) != cov.shape[0]:
-        print(f"Final Dim Mismatch: {len(z)} vs {cov.shape[0]}")
         return None, None, None
         
     try:
-        # Use pseudo-inverse for stability (Key Fix C)
         inv_cov = np.linalg.pinv(cov)
     except:
-        print("Matrix Inversion Failed"); return None, None, None
+        return None, None, None
         
     return z, mu, inv_cov
 
@@ -195,12 +162,8 @@ def load_sn(data_path, cov_path):
 bao_df, bao_data, bao_inv_cov = load_bao()
 
 def get_theory_w0wa(pars, z_sn):
-    # pars: [Om, w0, wa, H0]
-    Om, w0, wa, H0 = pars
-    
-    # CAMB Setup
+    Om, w0, wa, H0, ombh2 = pars
     h = H0 / 100.0
-    ombh2 = 0.0224
     omch2 = (Om * h**2) - ombh2
     if omch2 < 0: return None, None
     
@@ -215,7 +178,6 @@ def get_theory_w0wa(pars, z_sn):
     except:
         return None, None
 
-    # BAO
     if bao_df is not None:
         rd = results.get_derived_params()['rdrag']
         bao_preds = []
@@ -236,52 +198,42 @@ def get_theory_w0wa(pars, z_sn):
     else:
         bao_theory = None
 
-    # SN
     dl = results.luminosity_distance(z_sn)
     mu_theory = 5 * np.log10(dl) + 25
     
     return bao_theory, mu_theory
 
 def log_prob_w0wa(theta, z_sn, mu_sn, inv_sn_cov):
-    Om, w0, wa, H0 = theta
-    # Broad priors for w0wa
+    Om, w0, wa, H0, ombh2 = theta
     if not (0.1 < Om < 0.6): return -np.inf
     if not (-3.0 < w0 < 1.0): return -np.inf
     if not (-5.0 < wa < 5.0): return -np.inf
     if not (50 < H0 < 90): return -np.inf
-    # Stability condition for CAMB: w(z) should not be positive at high z
+    if not (0.015 < ombh2 < 0.030): return -np.inf
     if (w0 + wa) > 0: return -np.inf
+    
+    chi2_bbn = ((ombh2 - 0.0224) / 0.0004)**2
     
     bao_th, sn_th = get_theory_w0wa(theta, z_sn)
     if bao_th is None: return -np.inf
     
-    # --- 1. BAO Chi2 ---
     delta_bao = bao_data - bao_th
     chi2_bao = np.dot(delta_bao, np.dot(bao_inv_cov, delta_bao))
     
-    # --- 2. SN Chi2 (WITH MARGINALIZATION) ---
     delta_sn = mu_sn - sn_th
-    
-    # Standard Chi2
     chi2_stat = np.dot(delta_sn, np.dot(inv_sn_cov, delta_sn))
-    
-    # Marginalization over M
     sum_w = np.sum(inv_sn_cov)
     sum_w_delta = np.sum(np.dot(inv_sn_cov, delta_sn))
-    
     chi2_sn_marg = chi2_stat - (sum_w_delta**2 / sum_w)
     
-    return -0.5 * (chi2_bao + chi2_sn_marg)
+    return -0.5 * (chi2_bao + chi2_sn_marg + chi2_bbn)
 
 def run_chain(name, z, mu, inv_cov, steps=100):
     print(f"Running Chain (w0wa): {name} (Steps: {steps})")
-    # Initial position: 4 parameters
-    # Om=0.3, w0=-1.0, wa=0.0, H0=73.0
-    pos = [0.3, -1.0, 0.0, 73.0] + 1e-2 * np.random.randn(32, 4) # 32 walkers for 4 dims
+    pos = [0.3, -1.0, 0.0, 70.0, 0.0224] + 1e-3 * np.random.randn(32, 5)
     nwalkers, ndim = pos.shape
     
     backend_path = os.path.join(OUT_DIR, f"{name}.h5")
-    # Reset backend to ensure fresh run
     if os.path.exists(backend_path):
         os.remove(backend_path)
         
@@ -291,16 +243,8 @@ def run_chain(name, z, mu, inv_cov, steps=100):
     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_prob_w0wa, args=(z, mu, inv_cov), backend=backend)
     sampler.run_mcmc(pos, steps, progress=True)
     
-    # Analyze
-    try:
-        flat_samples = sampler.get_chain(discard=int(steps*0.3), flat=True)
-        mean_pars = np.mean(flat_samples, axis=0)
-        print(f"Results {name}: Om={mean_pars[0]:.3f}, w0={mean_pars[1]:.3f}, wa={mean_pars[2]:.3f}, H0={mean_pars[3]:.3f}")
-        return mean_pars
-    except:
-        return [0.3, -1.0, 0.0, 73.0]
+    return [0.3, -1.0, 0.0, 70.0, 0.0224]
 
-# --- EXECUTION ---
 tasks = {
     'Pantheon_Uncorr': (PANTHEON_UNCORR, PANTHEON_COV),
     'Pantheon_Lin': (PANTHEON_LIN, PANTHEON_COV),
@@ -310,22 +254,10 @@ tasks = {
     'DES_Poly': (DES_POLY, DES_COV)
 }
 
-results = {}
-
 if __name__ == "__main__":
+    results = {}
     for name, (dpath, cpath) in tasks.items():
         z, mu, inv = load_sn(dpath, cpath)
         if z is not None:
-             pars = run_chain(name, z, mu, inv, steps=150) # Increased steps for 4 params 
+             pars = run_chain(name, z, mu, inv, steps=250) 
              results[name] = pars
-        else:
-            print(f"Skipping {name} due to load error.")
-            
-    # Save Results
-    print("\n--- FINAL BEST FITS (w0wa) ---")
-    with open(os.path.join(OUT_DIR, "best_fits_w0wa.csv"), 'w') as f:
-        f.write("Dataset,Om,w0,wa,H0\n")
-        for k, v in results.items():
-            line = f"{k},{v[0]:.4f},{v[1]:.4f},{v[2]:.4f},{v[3]:.4f}"
-            print(line)
-            f.write(line + "\n")

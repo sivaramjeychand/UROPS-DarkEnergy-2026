@@ -29,30 +29,28 @@ task_map = {
 }
 
 def get_stats(chain):
-    # chain shape: (samples, dims) -> Om, w0, wa, H0
+    # chain shape: (samples, dims) -> Om, w0, wa, H0, ombh2
     # Calculate q0
     Om = chain[:, 0]
     w0 = chain[:, 1]
     q0 = 0.5 * Om + 0.5 * (1 - Om) * (1 + 3 * w0)
     
-    # Stats
-    mean_Om, std_Om = np.mean(Om), np.std(Om)
-    mean_w0, std_w0 = np.mean(w0), np.std(w0)
-    # wa is index 2
-    wa = chain[:, 2]
-    mean_wa, std_wa = np.mean(wa), np.std(wa)
-    
-    mean_q0, std_q0 = np.mean(q0), np.std(q0)
-    
+    def get_percentiles(data):
+        v = np.percentile(data, [16, 50, 84])
+        return (v[1], v[2] - v[1], v[1] - v[0]) # (median, upper_err, lower_err)
+
     return [
-        (mean_Om, std_Om),
-        (mean_w0, std_w0),
-        (mean_wa, std_wa),
-        (mean_q0, std_q0)
+        get_percentiles(Om),
+        get_percentiles(w0),
+        get_percentiles(chain[:, 2]), # wa
+        get_percentiles(q0)
     ]
 
-def fmt(mean, std):
-    return f"{mean:.3f} ± {std:.3f}"
+def fmt(med, up, lo):
+    # If errors are very close, show as +/-
+    if abs(up - lo) < 0.005:
+        return f"{med:.3f} ± {up:.3f}"
+    return f"{med:.3f} +{up:.3f}/-{lo:.3f}"
 
 rows = []
 

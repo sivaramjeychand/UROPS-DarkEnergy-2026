@@ -52,17 +52,21 @@ for name in datasets:
         q0_chain = calculate_q0_w0wa(flat_samples)
         
         # Calculate statistics
-        q0_mean = np.mean(q0_chain)
-        q0_std = np.std(q0_chain)
+        vals = np.percentile(q0_chain, [16, 50, 84])
+        q0_med = vals[1]
+        q0_up = vals[2] - vals[1]
+        q0_lo = vals[1] - vals[0]
         
-        state = "Accelerating" if q0_mean < 0 else "Decelerating"
+        state = "Accelerating" if q0_med < 0 else "Decelerating"
         
-        print(f"{name:<20} | {q0_mean:>.3f} +/- {q0_std:.3f} | {state}")
+        err_str = f"{q0_med:.3f} +{q0_up:.3f}/-{q0_lo:.3f}"
+        print(f"{name:<20} | {err_str:<15} | {state}")
         
         results.append({
             "Dataset": name,
-            "q0_mean": q0_mean,
-            "q0_std": q0_std,
+            "q0_median": q0_med,
+            "q0_upper": q0_up,
+            "q0_lower": q0_lo,
             "State": state
         })
         
