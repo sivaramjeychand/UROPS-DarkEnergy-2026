@@ -1,7 +1,6 @@
 
 import os
 import numpy as np
-import pd as pd
 import pandas as pd
 import emcee
 import camb

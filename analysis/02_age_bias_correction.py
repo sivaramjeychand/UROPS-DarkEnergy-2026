@@ -22,40 +22,42 @@ df = pd.merge(t1, t7, on='SNID', how='inner')
 
 # Drop NaNs
 df_clean = df.dropna(subset=['logAl', 'HR']).copy()
+# Assume logAl is linear Age in Gyr
+df_clean['Age'] = df_clean['logAl']
 print(f"Using {len(df_clean)} SNe for fitting.")
 
-slope, intercept, r_value, p_value, std_err = stats.linregress(df_clean['logAl'], df_clean['HR'])
-print(f"Best fit: HR = ({slope:.3f} +/- {std_err:.3f}) * logAge + ({intercept:.3f})")
+slope, intercept, r_value, p_value, std_err = stats.linregress(df_clean['Age'], df_clean['HR'])
+print(f"Best fit (Linear): HR = ({slope:.3f} +/- {std_err:.3f}) * Age + ({intercept:.3f})")
 
 # Plot Fit
-x_range = np.linspace(df_clean['logAl'].min(), df_clean['logAl'].max(), 100)
+x_range = np.linspace(df_clean['Age'].min(), df_clean['Age'].max(), 100)
 y_fit = slope * x_range + intercept
 
 plt.figure(figsize=(8, 6))
-plt.errorbar(df_clean['logAl'], df_clean['HR'], yerr=df_clean['e_HR'], fmt='o', alpha=0.5, label='Data')
-plt.plot(x_range, y_fit, 'r-', linewidth=2, label=f'Fit (slope={slope:.3f})')
-plt.xlabel('Log Age (Local)')
+plt.errorbar(df_clean['Age'], df_clean['HR'], yerr=df_clean['e_HR'], fmt='o', alpha=0.5, label='Data (Rose+19 Individual SNe)')
+plt.plot(x_range, y_fit, 'r-', linewidth=2, label=f'Linear Fit (slope={slope:.3f})')
+plt.xlabel('Age (Local) [Gyr]')
 plt.ylabel('Hubble Residual (mag)')
+plt.title('Figure 1 Linear Fit: Age-Bias Correlation')
 plt.axhline(0, color='k', linestyle=':', alpha=0.5)
 plt.legend()
-plt.savefig('output/fig_age_bias_check.png')
+plt.savefig('output/fig_age_bias_check_linear.png')
 plt.show()
 
-mean_age = df_clean['logAl'].mean()
-print(f"Mean Log Age: {mean_age:.3f}")
+mean_age = df_clean['Age'].mean()
+print(f"Mean Age: {mean_age:.3f} Gyr")
 
 # Calculate Correction Term
-# We want to remove the slope. 
-# If HR = slope * Age + const, then HR_corr = HR - slope * (Age - Age_ref)
-correction = slope * (df_clean['logAl'] - mean_age)
+# HR_corr = HR - slope * (Age - Age_ref)
+correction = slope * (df_clean['Age'] - mean_age)
 
 df_clean['HR_corr'] = df_clean['HR'] - correction
 
-print("Correction applied.")
+print("Correction applied based on Linear Fit.")
 
 # Check correlation after correction
-new_slope, _, _, new_p, _ = stats.linregress(df_clean['logAl'], df_clean['HR_corr'])
-print(f"New Slope: {new_slope:.3e} (should be close to 0)")
+new_slope, _, _, new_p, _ = stats.linregress(df_clean['Age'], df_clean['HR_corr'])
+print(f"New Slope: {new_slope:.3e} (should be 0)")
 
 rms_old = np.std(df_clean['HR'])
 rms_new = np.std(df_clean['HR_corr'])

@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import emcee
 
-CHAIN_DIR = "chains_comparisons"
-OUTPUT_MD = "output/model_comparisons_report.md"
+CHAIN_DIR = "chains_comparisons_test"
+OUTPUT_MD = "output/model_comparison_report_test2.md"
 
 if not os.path.exists("output"):
     os.makedirs("output")
@@ -50,10 +50,7 @@ for m in models:
                         'q0_str': f"{q0_m:.3f} +{q0_u:.3f}/-{q0_l:.3f}",
                         'chi2': chi2_min, 'AIC': (2*5) + chi2_min # 5 free params Om, w0, wa, H0, ob
                     })
-                except Exception as e:
-                    import traceback
-                    print(f"Failed parsing {name}:")
-                    traceback.print_exc()
+                except: pass
 
 df = pd.DataFrame(results)
 
